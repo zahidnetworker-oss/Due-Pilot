@@ -1,0 +1,187 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isEmailVerified() && request.auth.token.email == "zahid.networker@gmail.com";
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isEmailVerified() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
+      );
+    }
+
+    function isSalesman() {
+      return isEmailVerified() && (
+        isAdmin() || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "salesman" && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == "active"
+        )
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Schema and Validation Helpers ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'name', 'role', 'status'])
+        && data.keys().size() == 4
+        && data.email is string && data.email.size() <= 128
+        && data.name is string && data.name.size() <= 128
+        && data.role in ['admin', 'salesman']
+        && data.status in ['active', 'inactive'];
+    }
+
+    function isValidArea(data) {
+      return data.keys().hasAll(['name'])
+        && (data.keys().size() == 1 || (data.keys().size() == 2 && data.keys().hasAll(['name', 'description'])))
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && (!data.keys().hasAll(['description']) || (data.description is string && data.description.size() <= 300));
+    }
+
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['name', 'areaId', 'phone', 'openingDue', 'currentDue'])
+        && data.keys().size() == 5
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 128
+        && data.areaId is string && isValidId(data.areaId)
+        && data.phone is string && data.phone.size() <= 32
+        && data.openingDue is number
+        && data.currentDue is number;
+    }
+
+    function isValidSalesEntry(data) {
+      return data.keys().hasAll(['date', 'invoiceNo', 'year', 'customerId', 'areaId', 'saleAmount', 'collection', 'cash', 'check', 'previousDue', 'currentDue', 'salesmanId', 'salesmanName'])
+        && (data.keys().size() == 13 || (data.keys().size() == 14 && data.keys().hasAll(['remarks'])))
+        && data.date is string && data.date.size() == 10
+        && data.invoiceNo is string && data.invoiceNo.size() <= 64
+        && data.year is string && data.year.size() == 4
+        && data.customerId is string && isValidId(data.customerId)
+        && data.areaId is string && isValidId(data.areaId)
+        && data.saleAmount is number && data.saleAmount >= 0
+        && data.collection is number && data.collection >= 0
+        && data.cash is number && data.cash >= 0
+        && data.check is number && data.check >= 0
+        && data.previousDue is number
+        && data.currentDue is number
+        && data.salesmanId is string && isValidId(data.salesmanId)
+        && data.salesmanName is string && data.salesmanName.size() <= 128
+        && (!data.keys().hasAll(['remarks']) || (data.remarks is string && data.remarks.size() <= 500));
+    }
+
+    // --- Collections ---
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow read: if isEmailVerified();
+      
+      // Creating user profiles
+      allow create: if isEmailVerified() && isValidUser(incoming()) && (
+        // An admin can create any user
+        isAdmin() || 
+        // A user can create their own profile during initial Google Login,
+        // BUT force their role to be Salesman, never Admin (Prevent Self-Assign role escalation)
+        (userId == request.auth.uid && incoming().role == 'salesman' && incoming().status == 'active' && incoming().email == request.auth.token.email)
+      );
+
+      // Updating user profiles
+      allow update: if isEmailVerified() && isValidUser(incoming()) && (
+        // Only admins can change status/role or update other profiles
+        isAdmin() || 
+        // Simple profile updates for own account, avoiding changing their own critical role/status fields
+        (userId == request.auth.uid 
+         && incoming().role == existing().role 
+         && incoming().status == existing().status
+         && incoming().email == existing().email)
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // 2. Areas Collection
+    match /areas/{areaId} {
+      allow read: if isSalesman() || isAdmin();
+      allow create: if isAdmin() && isValidId(areaId) && isValidArea(incoming());
+      allow update: if isAdmin() && isValidId(areaId) && isValidArea(incoming());
+      allow delete: if isAdmin() && isValidId(areaId);
+    }
+
+    // 3. Customers Collection
+    match /customers/{customerId} {
+      allow read: if isSalesman() || isAdmin();
+      
+      // Creating customer requires Admin
+      allow create: if isAdmin() && isValidId(customerId) && isValidCustomer(incoming()) && (
+        // Verify referential integrity of Area
+        exists(/databases/$(database)/documents/areas/$(incoming().areaId))
+      );
+
+      // Updating customers:
+      // - Admins can update anything (such as changing phone, name, area, dues)
+      // - Active Salesmen can update ONLY the currentDue field based on a transaction,
+      //   to prevent tampering of customer info or opening dues.
+      allow update: if isValidId(customerId) && isValidCustomer(incoming()) && (
+        isAdmin() || (
+          isSalesman() 
+          && incoming().name == existing().name
+          && incoming().areaId == existing().areaId
+          && incoming().phone == existing().phone
+          && incoming().openingDue == existing().openingDue
+          && incoming().diff(existing()).affectedKeys().hasOnly(['currentDue'])
+        )
+      );
+
+      allow delete: if isAdmin() && isValidId(customerId);
+    }
+
+    // 4. Sales Collection
+    match /sales/{saleId} {
+      // Direct reads can be performed by active staff
+      allow read: if isSalesman() || isAdmin();
+      
+      // Creating sales: Salesmen and Admins can create
+      allow create: if (isSalesman() || isAdmin()) && isValidId(saleId) && isValidSalesEntry(incoming()) && (
+        // Strict identity check: salesmanId must match their actual authenticated UID
+        incoming().salesmanId == request.auth.uid &&
+        // Verify referential integrity of Customer and Area
+        exists(/databases/$(database)/documents/customers/$(incoming().customerId)) &&
+        exists(/databases/$(database)/documents/areas/$(incoming().areaId))
+      );
+
+      // Sales are immutable except by Admin to correct mistakes
+      allow update: if isAdmin() && isValidId(saleId) && isValidSalesEntry(incoming());
+      
+      // Only Admins can delete transactions
+      allow delete: if isAdmin() && isValidId(saleId);
+    }
+  }
+}

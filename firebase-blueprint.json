@@ -1,0 +1,171 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "An ERP system user, representing either an Admin or a Salesman",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The user's email address"
+        },
+        "name": {
+          "type": "string",
+          "description": "The user's display name"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "salesman"],
+          "description": "Access privileges within the system"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "inactive"],
+          "description": "User account status"
+        }
+      },
+      "required": ["email", "name", "role", "status"]
+    },
+    "Area": {
+      "title": "Area",
+      "description": "A custom geographical territory or area managed in the system",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The unique name of the area"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of the area"
+        }
+      },
+      "required": ["name"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "A customer profile including contact details and financial balances",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The customer's name"
+        },
+        "areaId": {
+          "type": "string",
+          "description": "The unique identifier of the area where customer belongs"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Mobile or phone number associated with the customer"
+        },
+        "openingDue": {
+          "type": "number",
+          "description": "The initial outstanding dues during setup"
+        },
+        "currentDue": {
+          "type": "number",
+          "description": "The current outstanding dues based on running entries"
+        }
+      },
+      "required": ["name", "areaId", "phone", "openingDue", "currentDue"]
+    },
+    "SalesEntry": {
+      "title": "SalesEntry",
+      "description": "A daily transactional record storing invoices, sales amounts, and cash/check collections",
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "The invoice date (YYYY-MM-DD)"
+        },
+        "invoiceNo": {
+          "type": "string",
+          "description": "The manually editable invoice number"
+        },
+        "year": {
+          "type": "string",
+          "description": "The active fiscal or calendar year of the transaction"
+        },
+        "customerId": {
+          "type": "string",
+          "description": "The reference identifier of the customer"
+        },
+        "areaId": {
+          "type": "string",
+          "description": "Auto-detected base area identifier of the customer"
+        },
+        "saleAmount": {
+          "type": "number",
+          "description": "The total sales amount for the transaction"
+        },
+        "collection": {
+          "type": "number",
+          "description": "The combined cash and check collection amount (Cash + Check)"
+        },
+        "cash": {
+          "type": "number",
+          "description": "The cash portion of the collection"
+        },
+        "check": {
+          "type": "number",
+          "description": "The check portion of the collection"
+        },
+        "previousDue": {
+          "type": "number",
+          "description": "The customer's due balance prior to this ticket transaction"
+        },
+        "currentDue": {
+          "type": "number",
+          "description": "The newly calculated current due: Previous Due + Sale Amount - Collection"
+        },
+        "remarks": {
+          "type": "string",
+          "description": "Optional remarks or memos for the entry"
+        },
+        "salesmanId": {
+          "type": "string",
+          "description": "The user identifier who submitted this transaction record"
+        },
+        "salesmanName": {
+          "type": "string",
+          "description": "Name of the salesman who facilitated the interaction"
+        }
+      },
+      "required": [
+        "date",
+        "invoiceNo",
+        "year",
+        "customerId",
+        "areaId",
+        "saleAmount",
+        "collection",
+        "cash",
+        "check",
+        "previousDue",
+        "currentDue",
+        "salesmanId",
+        "salesmanName"
+      ]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Global register of systems users containing administrators and salesmen"
+    },
+    "areas": {
+      "schema": "Area",
+      "description": "Custom geographic areas or routes managed by administrators"
+    },
+    "customers": {
+      "schema": "Customer",
+      "description": "Active ledger registry listings for billing partners"
+    },
+    "sales": {
+      "schema": "SalesEntry",
+      "description": "Chronological history of invoices, returns, and sales transactions"
+    }
+  }
+}

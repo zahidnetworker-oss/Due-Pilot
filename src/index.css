@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+@media print {
+  /* Set standard A4 portrait sizing and appropriate margins */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 15mm 15mm 15mm;
+  }
+
+  /* Universal reset to override dark theme with professional high-contrast daylight colors */
+  html, body, #root, [data-reactroot] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Strip out dark panel gradients and solid black colors to clean paper sheets */
+  div, section, tr, td, th {
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    color: #1e293b !important;
+  }
+
+  /* Style all tables for absolute professional bookkeeping clarity */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    color: #000000 !important;
+    page-break-inside: auto !important;
+  }
+
+  /* Repeating headers on multiple pages if report overflows */
+  thead {
+    display: table-header-group !important;
+  }
+
+  /* Explicitly prevent row cutoff mid-text on page breaks */
+  tr, .print-signature, h1, h2, h3, h4, th {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Header columns for tabular ledgers */
+  th {
+    color: #334155 !important;
+    font-weight: 700 !important;
+    border-bottom: 2px solid #64748b !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    background-color: #f8fafc !important; /* Soft paper-gray */
+  }
+
+  /* Clean spreadsheet line dividers */
+  td {
+    color: #334155 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
+  /* Reset all visual helper borders */
+  .border, 
+  .border-t, 
+  .border-b, 
+  .border-r, 
+  .border-l, 
+  .border-white\/5, 
+  .border-white\/10,
+  .divide-white\/5,
+  .divide-y > * {
+    border-color: #cbd5e1 !important;
+    border-width: 1px !important;
+  }
+
+  /* Keep core summaries / outstanding values very legible */
+  .text-white, .text-slate-100, .text-slate-200, .text-slate-300 {
+    color: #0f172a !important;
+    font-weight: 600 !important;
+  }
+
+  /* Convert red alert text (debits / dues) to highly readable red ink */
+  .text-rose-400, .text-rose-455 {
+    color: #991b1b !important;
+    font-weight: 700 !important;
+  }
+
+  /* Convert green success text (collections / credits) to clear green ink */
+  .text-emerald-400, .text-emerald-450 {
+    color: #166534 !important;
+    font-weight: 700 !important;
+  }
+
+  /* Fully expand layout and strip paddings for printing */
+  main, .max-w-7xl, .w-full {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Force background colors to print across modern browsers and PDF engines */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide unrelated interface clutter on paper outputs */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Display elements intended exclusively for statement sheets */
+  .hidden.print\:block {
+    display: block !important;
+  }
+
+  .hidden.print\:flex {
+    display: flex !important;
+  }
+}
