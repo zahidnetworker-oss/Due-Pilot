@@ -1,6 +1,6 @@
 {
-  "name": "DuePilot ERP",
-  "description": "DuePilot is a premium SaaS ERP Dashboard with automated custom area reporting, daily sales records, client ledgers, and statement audits to take control of every collection.",
+  "name": "Sales ERP SaaS",
+  "description": "Sales ERP SaaS is a premium SaaS ERP Dashboard with automated custom area reporting, daily sales records, client ledgers, and statement audits to take control of every collection.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

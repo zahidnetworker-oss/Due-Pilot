@@ -196,9 +196,9 @@ function initializeLocalStorage() {
   if (!localStorage.getItem("erp_sales")) {
     localStorage.setItem("erp_sales", JSON.stringify(defaultSales));
   }
-  if (!localStorage.getItem("erp_users")) {
+  if (!localStorage.getItem("erp_users") || localStorage.getItem("erp_users")?.includes("zahid.networker@gmail.com")) {
     const defaultUsers: AppUser[] = [
-      { id: "demo-admin", email: "zahid.networker@gmail.com", name: "Ahmad Fauzi", role: "admin", status: "active" },
+      { id: "demo-admin", email: "admin@duepilot.com", name: "Ahmad Fauzi", role: "admin", status: "active" },
       { id: "demo-sales", email: "salesman@example.com", name: "Jeffrey Lim", role: "salesman", status: "active" }
     ];
     localStorage.setItem("erp_users", JSON.stringify(defaultUsers));
@@ -338,13 +338,26 @@ export const dbService = {
     }
   },
 
-  async addCustomer(name: string, areaId: string, phone: string, openingDue: number): Promise<Customer> {
+  async addCustomer(
+    name: string,
+    areaId: string,
+    phone: string,
+    openingDue: number,
+    shopName?: string,
+    address?: string,
+    emailAddress?: string,
+    profilePicture?: string
+  ): Promise<Customer> {
     const payload = {
       name,
       areaId,
       phone,
       openingDue,
       currentDue: openingDue, // Initial state
+      shopName: shopName || "",
+      address: address || "",
+      emailAddress: emailAddress || "",
+      profilePicture: profilePicture || "",
     };
     if (this.isFirebaseActive()) {
       const colPath = "customers";

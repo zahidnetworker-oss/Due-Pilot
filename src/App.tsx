@@ -17,6 +17,7 @@ import AreaManagement from "./components/AreaManagement";
 import DailySalesView from "./components/DailySalesView";
 import MonthlyReportView from "./components/MonthlyReportView";
 import CustomerLedgerView from "./components/CustomerLedgerView";
+import SettingsView from "./components/SettingsView";
 
 import {
   Menu,
@@ -184,6 +185,8 @@ export default function App() {
         return <CustomerLedgerView areas={areas} customers={customers} sales={sales} />;
       case "reports":
         return <MonthlyReportView areas={areas} customers={customers} sales={sales} />;
+      case "settings":
+        return <SettingsView currentUser={currentUser!} refreshData={fetchERPDatabase} />;
       default:
         return <DashboardView areas={areas} customers={customers} sales={sales} />;
     }

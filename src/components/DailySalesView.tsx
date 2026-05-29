@@ -37,6 +37,7 @@ export default function DailySalesView({
   refreshData,
 }: DailySalesViewProps) {
   const isAdmin = currentUser.role === "admin";
+  const currencySymbol = localStorage.getItem("duepilot_currency") || "RM";
 
   // Form Fields
   const [date, setDate] = useState(() => {
@@ -162,7 +163,7 @@ export default function DailySalesView({
   // Re-adjust dues when delete
   const handleDeleteInvoice = async (sale: SalesEntry) => {
     if (!isAdmin) return;
-    if (!confirm(`Warning: Deleting transaction "${sale.invoiceNo}" will permanently reverse its ledger balance additions of RM${sale.saleAmount - sale.collection} from the customer's profile! Proceed?`)) return;
+    if (!confirm(`Warning: Deleting transaction "${sale.invoiceNo}" will permanently reverse its ledger balance additions of ${currencySymbol}${sale.saleAmount - sale.collection} from the customer's profile! Proceed?`)) return;
 
     try {
       // Adjustment value = Sale - Collection
@@ -292,7 +293,7 @@ export default function DailySalesView({
                     <Tags className="w-4 h-4 text-orange-400 shrink-0" />
                     <div>
                       <span className="block text-[9px] text-slate-500 font-mono uppercase">Ledger Previous Due</span>
-                      <span className="text-xs font-mono font-bold text-orange-400">RM{calculatedStats.previousDue.toLocaleString()}</span>
+                      <span className="text-xs font-mono font-bold text-orange-400">{currencySymbol}{calculatedStats.previousDue.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -302,7 +303,7 @@ export default function DailySalesView({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-slate-500 uppercase">Gross Sale Amount (RM)</label>
+                  <label className="text-[10px] font-mono text-slate-500 uppercase">Gross Sale Amount ({currencySymbol})</label>
                   <input
                     type="number"
                     step="any"
@@ -314,7 +315,7 @@ export default function DailySalesView({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-emerald-450 text-emerald-400 uppercase">Cash Collected (RM)</label>
+                  <label className="text-[10px] font-mono text-emerald-450 text-emerald-400 uppercase">Cash Collected ({currencySymbol})</label>
                   <input
                     type="number"
                     step="any"
@@ -326,7 +327,7 @@ export default function DailySalesView({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-blue-450 text-blue-400 uppercase">Check/Bank credit (RM)</label>
+                  <label className="text-[10px] font-mono text-blue-450 text-blue-400 uppercase">Check/Bank credit ({currencySymbol})</label>
                   <input
                     type="number"
                     step="any"
@@ -345,14 +346,14 @@ export default function DailySalesView({
                   <div className="bg-[#0A0A0B] p-3.5 rounded-xl border border-white/5">
                     <span className="block text-[8px] font-mono text-slate-500 uppercase">Aggregated Collection</span>
                     <span className="text-sm font-mono font-semibold text-emerald-400 mt-1 block">
-                      RM{calculatedStats.collection.toLocaleString()}
+                      {currencySymbol}{calculatedStats.collection.toLocaleString()}
                     </span>
                   </div>
 
                   <div className="bg-[#0A0A0B] p-3.5 rounded-xl border border-white/5 col-span-1 md:col-span-2">
                     <span className="block text-[8px] font-mono text-slate-500 uppercase">Forecast outstanding Current Due</span>
                     <span className={`text-sm font-mono font-bold mt-1 block ${calculatedStats.currentDue > 15000 ? "text-rose-400" : "text-emerald-400"}`}>
-                      RM{calculatedStats.currentDue.toLocaleString()}
+                      {currencySymbol}{calculatedStats.currentDue.toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -449,15 +450,15 @@ export default function DailySalesView({
                       <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-mono border-t border-white/5 pt-2 bg-white/5 p-1 px-1.5 rounded-lg border border-white/5">
                         <div>
                           <span className="block text-slate-500 text-[8px] uppercase">Sale</span>
-                          <span className="text-slate-300 font-semibold">RM{sale.saleAmount}</span>
+                          <span className="text-slate-300 font-semibold">{currencySymbol}{sale.saleAmount}</span>
                         </div>
                         <div>
                           <span className="block text-emerald-400 text-[8px] uppercase">Cash</span>
-                          <span className="text-emerald-400 font-semibold">RM{sale.cash}</span>
+                          <span className="text-emerald-400 font-semibold">{currencySymbol}{sale.cash}</span>
                         </div>
                         <div>
                           <span className="block text-blue-400 text-[8px] uppercase">Check</span>
-                          <span className="text-blue-400 font-semibold">RM{sale.check}</span>
+                          <span className="text-blue-400 font-semibold">{currencySymbol}{sale.check}</span>
                         </div>
                       </div>
 
@@ -465,11 +466,11 @@ export default function DailySalesView({
                       <div className="flex justify-between items-center text-[10px] text-slate-400 border-t border-white/5 pt-1.5 px-0.5 font-mono">
                         <div>
                           <span className="text-slate-500 text-[9px] mr-1">Prev:</span>
-                          <strong>RM{sale.previousDue}</strong>
+                          <strong>{currencySymbol}{sale.previousDue}</strong>
                         </div>
                         <div>
                           <span className="text-slate-500 text-[9px] mr-1">Next:</span>
-                          <strong className="text-emerald-400 font-bold">RM{sale.currentDue}</strong>
+                          <strong className="text-emerald-400 font-bold">{currencySymbol}{sale.currentDue}</strong>
                         </div>
                       </div>
 

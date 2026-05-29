@@ -27,6 +27,10 @@ export interface Customer {
   phone: string;
   openingDue: number; // Opening ledger balance due
   currentDue: number; // Automatically tracked balance
+  shopName?: string;
+  address?: string;
+  emailAddress?: string;
+  profilePicture?: string; // base64 string or image url
 }
 
 export interface SalesEntry {

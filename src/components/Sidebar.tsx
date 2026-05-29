@@ -17,6 +17,7 @@ import {
   LogOut,
   ShieldAlert,
   Menu,
+  Settings,
   X
 } from "lucide-react";
 
@@ -44,6 +45,7 @@ export default function Sidebar({
     { id: "areas", label: "Area Settings", icon: MapPin },
     { id: "ledger", label: "Customer Ledger", icon: BookOpen },
     { id: "reports", label: "Monthly Reports", icon: FileSpreadsheet },
+    { id: "settings", label: "Settings", icon: Settings },
   ];
 
   const handleTabClick = (tabId: string) => {
@@ -64,10 +66,10 @@ export default function Sidebar({
         />
         <div>
           <h2 className="font-bold text-sm tracking-tight text-white flex items-center gap-1">
-            <span className="text-slate-300">Due</span>
-            <span className="text-[#FFD700]">Pilot</span>
+            <span className="text-slate-300">Sales</span>
+            <span className="text-[#FFD700]">ERP</span>
           </h2>
-          <span className="text-[9px] font-mono text-[#FFD700] uppercase tracking-wider block mt-0.5">SaaS ERP Suite</span>
+          <span className="text-[9px] font-mono text-[#FFD700] uppercase tracking-wider block mt-0.5">SaaS Suite</span>
         </div>
       </div>
 

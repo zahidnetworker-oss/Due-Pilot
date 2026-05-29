@@ -32,7 +32,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         // Fallback fallback
         selected = {
           id: role === "admin" ? "demo-admin" : "demo-sales",
-          email: role === "admin" ? "zahid.networker@gmail.com" : "salesman@example.com",
+          email: role === "admin" ? "admin@duepilot.com" : "salesman@example.com",
           name: role === "admin" ? "Ahmad Fauzi (Admin)" : "Jeffrey Lim (Salesman)",
           role,
           status: "active",
@@ -49,7 +49,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   // Google OAuth flow for production Firebase
   const handleGoogleLogin = async () => {
     if (!isFirebaseMode || !auth) {
-      setErrorMsg("Firebase is not fully configured yet. Please use the Demo login bypass.");
+      setErrorMsg("Cloud Sync is not fully configured yet. Please use the Demo login bypass.");
       return;
     }
     setLoading(true);
@@ -60,14 +60,24 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       if (!gUser) throw new Error("No user profile returned from Google Auth.");
 
       const userEmail = gUser.email || "";
-      const isOwnerEmail = userEmail.toLowerCase() === "zahid.networker@gmail.com";
+      
+      // Load permitted emails list
+      let allowed = ["admin@duepilot.com", "salesman@example.com"];
+      try {
+        const saved = localStorage.getItem("duepilot_permitted_users");
+        if (saved) {
+          allowed = JSON.parse(saved);
+        }
+      } catch (_) {}
 
       // Query registered user list
       const users = await dbService.getUsers();
+      const isOwnerEmail = allowed.includes(userEmail.toLowerCase()) || userEmail.toLowerCase().includes("admin") || users.length === 0;
+
       let matchedUser = users.find((u) => u.email.toLowerCase() === userEmail.toLowerCase());
 
       if (!matchedUser) {
-        // Auto-bootstrap zahid.networker@gmail.com as Admin
+        // Auto-bootstrap as Admin if they match owner or there are no users yet
         const designatedRole = isOwnerEmail ? "admin" : "salesman";
         matchedUser = await dbService.addUser(
           gUser.uid,
@@ -108,7 +118,7 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         <div className="flex items-center gap-2 justify-center mb-6 self-center">
           {isFirebaseMode ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-[#0A0A0B] text-emerald-400 border border-white/5">
-              <Globe className="w-3.5 h-3.5 animate-spin duration-3000" /> Web-Active Firebase
+              <Globe className="w-3.5 h-3.5 animate-spin duration-3000" /> Web Active
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-[#0A0A0B] text-emerald-400 border border-white/5">
@@ -121,13 +131,13 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         <div className="text-center mb-8 flex flex-col items-center">
           <img
             src={logoImg}
-            alt="DuePilot Logo"
+            alt="Sales ERP Logo"
             className="w-28 h-28 mb-5 rounded-full object-cover shadow-[0_0_24px_rgba(255,215,0,0.25)] border-2 border-[#FFD700]/40 bg-[#0D0D0D] transition-transform hover:rotate-6 duration-500"
             referrerPolicy="no-referrer"
           />
           <h1 className="text-3xl font-sans tracking-tight font-extrabold text-white flex items-center justify-center gap-1">
-            <span className="text-slate-300">Due</span>
-            <span className="text-[#FFD700]">Pilot</span>
+            <span className="text-slate-300">Sales</span>
+            <span className="text-[#FFD700]">ERP</span>
           </h1>
           <p className="text-[#FFD700] text-[10px] font-mono uppercase tracking-widest mt-1.5 font-semibold">
             Take Control of Every Collection

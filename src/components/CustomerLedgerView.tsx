@@ -35,6 +35,7 @@ export interface LedgerRow {
 }
 
 export default function CustomerLedgerView({ areas, customers, sales }: CustomerLedgerViewProps) {
+  const currencySymbol = localStorage.getItem("duepilot_currency") || "RM";
   
   // Selected state
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
@@ -121,13 +122,13 @@ export default function CustomerLedgerView({ areas, customers, sales }: Customer
           </td>
           <td style="padding: 10px 12px; font-size: 11px; font-style: italic; color: #475569; max-width: 240px; word-wrap: break-word;">${row.description}</td>
           <td style="padding: 10px 12px; text-align: right; font-family: monospace; font-size: 11px; color: #b91c1c; font-weight: 600;">
-            ${row.debit > 0 ? `RM ${row.debit.toLocaleString()}` : "-"}
+            ${row.debit > 0 ? `${currencySymbol} ${row.debit.toLocaleString()}` : "-"}
           </td>
           <td style="padding: 10px 12px; text-align: right; font-family: monospace; font-size: 11px; color: #15803d; font-weight: 600;">
-            ${row.credit > 0 ? `RM ${row.credit.toLocaleString()}` : "-"}
+            ${row.credit > 0 ? `${currencySymbol} ${row.credit.toLocaleString()}` : "-"}
           </td>
           <td style="padding: 10px 12px; text-align: right; font-family: monospace; font-size: 11px; font-weight: bold; color: #0f172a;">
-            RM ${row.runningBalance.toLocaleString()}
+            ${currencySymbol} ${row.runningBalance.toLocaleString()}
           </td>
         </tr>
       `;
@@ -137,22 +138,31 @@ export default function CustomerLedgerView({ areas, customers, sales }: Customer
       <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; background-color: #ffffff; padding: 32px; box-sizing: border-box; width: 800px;">
         <!-- Header Sheet -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #334155; padding-bottom: 18px; margin-bottom: 24px;">
-          <div>
-            <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: #64748b; font-weight: 700;">APEX SALES SYSTEMS</span>
-            <h1 style="font-size: 22px; font-weight: 800; color: #0f172a; margin: 4px 0 0 0; letter-spacing: -0.02em;">CUSTOMER STATEMENT REPORT</h1>
-            <h2 style="font-size: 14px; font-weight: 600; color: #334155; margin: 4px 0 0 0;">Account Name: ${activeCustomer.name}</h2>
-            <div style="font-size: 11px; color: #475569; margin-top: 3px;"><strong>Phone Contact:</strong> ${activeCustomer.phone}</div>
-            <div style="font-size: 11px; color: #475569; margin-top: 1px;"><strong>Territory Route:</strong> ${areaMap[activeCustomer.areaId] || "N/A"}</div>
+          <div style="display: flex; gap: 16px; align-items: center;">
+            ${activeCustomer.profilePicture ? `
+              <img src="${activeCustomer.profilePicture}" style="width: 76px; height: 76px; border-radius: 50%; border: 2px solid #cbd5e1; object-fit: cover; margin-right: 12px;" />
+            ` : `
+              <div style="width: 76px; height: 76px; border-radius: 50%; border: 2px solid #cbd5e1; background-color: #f1f5f9; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #64748b; font-size: 22px; margin-right: 12px; font-family: sans-serif;">
+                ${activeCustomer.name.substring(0, 2).toUpperCase()}
+              </div>
+            `}
+            <div>
+              <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: #64748b; font-weight: 700;">DUEPILOT ERP SYSTEMS</span>
+              <h1 style="font-size: 20px; font-weight: 800; color: #0f172a; margin: 4px 0 0 0; letter-spacing: -0.02em;">CUSTOMER STATEMENT REPORT</h1>
+              <h2 style="font-size: 13px; font-weight: 600; color: #334155; margin: 4px 0 0 0;">Account Name: ${activeCustomer.name}</h2>
+              <div style="font-size: 11px; color: #475569; margin-top: 3px;"><strong>Shop Store:</strong> ${activeCustomer.shopName || "N/A"} | <strong>Email:</strong> ${activeCustomer.emailAddress || "N/A"}</div>
+              <div style="font-size: 11px; color: #475569; margin-top: 1px;"><strong>Phone Contact:</strong> ${activeCustomer.phone} | <strong>Territory Route:</strong> ${areaMap[activeCustomer.areaId] || "N/A"}</div>
+            </div>
           </div>
-          <div style="text-align: right; font-size: 11px; color: #475569; line-height: 1.6; min-width: 250px;">
+          <div style="text-align: right; font-size: 11px; color: #475569; line-height: 1.6; min-width: 200px;">
             <div><strong>Report Date:</strong> ${today.toLocaleDateString('en-GB') || todayDateStr}</div>
             <div><strong>Status Indicator:</strong> Verified Ledger Book</div>
             <div style="margin-top: 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 8px; display: inline-block; text-align: left;">
               <span style="font-size: 10px; color: #64748b; display: block; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Ledger Opening Due:</span>
-              <strong style="color: #0f172a; font-size: 12px; font-family: monospace;">RM ${activeCustomer.openingDue.toLocaleString()}</strong>
+              <strong style="color: #0f172a; font-size: 12px; font-family: monospace;">${currencySymbol} ${activeCustomer.openingDue.toLocaleString()}</strong>
               
               <span style="font-size: 10px; color: #64748b; display: block; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; margin-top: 4px;">Outsourcing Liability:</span>
-              <strong style="color: #b91c1c; font-size: 13px; font-family: monospace;">RM ${activeCustomer.currentDue.toLocaleString()}</strong>
+              <strong style="color: #b91c1c; font-size: 13px; font-family: monospace;">${currencySymbol} ${activeCustomer.currentDue.toLocaleString()}</strong>
             </div>
           </div>
         </div>
@@ -175,10 +185,16 @@ export default function CustomerLedgerView({ areas, customers, sales }: Customer
         </table>
 
         <!-- Audit Signatures -->
-        <div style="margin-top: 80px; display: flex; justify-content: space-between; text-align: center; font-size: 10px; font-family: monospace; color: #475569; page-break-inside: avoid;">
-          <div style="width: 200px; border-top: 1px solid #94a3b8; padding-top: 8px; font-weight: 600;">Authorised Auditor</div>
-          <div style="width: 200px; border-top: 1px solid #94a3b8; padding-top: 8px; font-weight: 600;">Finance Stamp</div>
-          <div style="width: 200px; border-top: 1px solid #94a3b8; padding-top: 8px; font-weight: 600;">Customer Signature</div>
+        <div style="margin-top: 50px; display: flex; justify-content: space-between; text-align: center; font-size: 10px; font-family: monospace; color: #475569; page-break-inside: avoid;">
+          <div style="width: 180px; border-top: 1px solid #94a3b8; padding-top: 8px; font-weight: 600;">Authorised Auditor</div>
+          <div style="width: 180px; border-top: 1px solid #94a3b8; padding-top: 8px; font-weight: 600;">Finance Stamp</div>
+          <div style="width: 180px; border-top: 1px solid #94a3b8; padding-top: 8px; font-weight: 600;">Customer Signature</div>
+        </div>
+
+        <!-- Footer Info with Application metadata tag -->
+        <div style="margin-top: 40px; border-top: 1px dashed #cbd5e1; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #64748b; font-family: monospace;">
+          <span>Created By: ${localStorage.getItem("duepilot_profile_settings") ? JSON.parse(localStorage.getItem("duepilot_profile_settings")!).name : "Executive Admin"}</span>
+          <span>App: Sales ERP SaaS • Version: v1.2.0 • Year: 2026</span>
         </div>
       </div>
     `;
@@ -212,7 +228,7 @@ export default function CustomerLedgerView({ areas, customers, sales }: Customer
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Customer Ledgers</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white font-sans">Customer Ledgers</h1>
           <p className="text-sm text-slate-400 mt-1 font-light">
             Search, select, and review rolling chronological liabilities and statement balances.
           </p>
@@ -273,15 +289,15 @@ export default function CustomerLedgerView({ areas, customers, sales }: Customer
 
             <div className="bg-[#161618] border border-white/5 p-4.5 rounded-xl">
               <span className="text-[9px] font-mono text-slate-500 uppercase block">Setup Opening Balance</span>
-              <h3 className="text-sm font-mono font-bold text-slate-400 mt-1">
-                RM{activeCustomer.openingDue.toLocaleString()}
+              <h3 className="text-sm font-mono font-bold text-slate-400 mt-1 block">
+                {currencySymbol}{activeCustomer.openingDue.toLocaleString()}
               </h3>
             </div>
 
             <div className="bg-[#161618] border border-white/5 p-4.5 rounded-xl">
               <span className="text-[9px] font-mono text-slate-500 uppercase block">Outsourcing Net liability</span>
-              <h3 className="text-sm font-mono font-extrabold text-rose-455 text-rose-400 mt-1">
-                RM{activeCustomer.currentDue.toLocaleString()}
+              <h3 className="text-sm font-mono font-extrabold text-rose-455 text-rose-400 mt-1 block">
+                {currencySymbol}{activeCustomer.currentDue.toLocaleString()}
               </h3>
             </div>
 
@@ -311,9 +327,9 @@ export default function CustomerLedgerView({ areas, customers, sales }: Customer
                     <th className="py-3 px-5">Date</th>
                     <th className="py-3 px-5">Ref Code</th>
                     <th className="py-3 px-5">Description / Remarks Memo</th>
-                    <th className="py-3 px-5 text-right text-rose-400 print:text-slate-900">Purchase Debit (RM)</th>
-                    <th className="py-3 px-5 text-right text-emerald-450 text-emerald-400 print:text-slate-900">Collection Credit (RM)</th>
-                    <th className="py-3 px-5 text-right">Rolling Outstanding (RM)</th>
+                    <th className="py-3 px-5 text-right text-rose-400 print:text-slate-900">Purchase Debit ({currencySymbol})</th>
+                    <th className="py-3 px-5 text-right text-emerald-450 text-emerald-400 print:text-slate-900">Collection Credit ({currencySymbol})</th>
+                    <th className="py-3 px-5 text-right">Rolling Outstanding ({currencySymbol})</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 text-xs print:divide-slate-300">
@@ -339,13 +355,13 @@ export default function CustomerLedgerView({ areas, customers, sales }: Customer
                           {row.description}
                         </td>
                         <td className="py-3.5 px-5 text-right font-mono text-rose-400 font-medium print:text-slate-900">
-                          {row.debit > 0 ? `RM${row.debit.toLocaleString()}` : "-"}
+                          {row.debit > 0 ? `${currencySymbol}${row.debit.toLocaleString()}` : "-"}
                         </td>
                         <td className="py-3.5 px-5 text-right font-mono text-emerald-400 font-medium print:text-slate-900">
-                          {row.credit > 0 ? `RM${row.credit.toLocaleString()}` : "-"}
+                          {row.credit > 0 ? `${currencySymbol}${row.credit.toLocaleString()}` : "-"}
                         </td>
                         <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-200 print:text-slate-900">
-                          RM{row.runningBalance.toLocaleString()}
+                          {currencySymbol}{row.runningBalance.toLocaleString()}
                         </td>
                       </tr>
                     );

@@ -4,7 +4,32 @@
  */
 
 import React, { useMemo } from "react";
+import { motion } from "motion/react";
 import { Area, Customer, SalesEntry } from "../types";
+
+// Animation configurations for staggered montages
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08
+    }
+  }
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 12 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      stiffness: 120,
+      damping: 14
+    }
+  }
+};
 import {
   TrendingUp,
   Coins,
@@ -13,7 +38,12 @@ import {
   FolderLock,
   ArrowUpRight,
   ArrowDownLeft,
-  CirclePercent
+  CirclePercent,
+  Award,
+  Flame,
+  Calendar,
+  History,
+  CalendarClock
 } from "lucide-react";
 
 interface DashboardViewProps {
@@ -23,7 +53,54 @@ interface DashboardViewProps {
 }
 
 export default function DashboardView({ areas, customers, sales }: DashboardViewProps) {
+  const currencySymbol = localStorage.getItem("duepilot_currency") || "RM";
   
+  // Load dynamic target rules and calculate actual monthly collection values
+  const targets = useMemo(() => {
+    const currentYrMo = new Date().toISOString().slice(0, 7); // e.g. "2026-05"
+    let currentMoSales = 0;
+    let currentMoCollection = 0;
+
+    sales.forEach((s) => {
+      if (s.date && s.date.startsWith(currentYrMo)) {
+        currentMoSales += s.saleAmount || 0;
+        currentMoCollection += s.collection || 0;
+      }
+    });
+
+    let salesTarget = 30000;
+    let collectionTarget = 25000;
+    let lastMonthSalesTarget = 28000;
+    let lastMonthSalesActual = 26500;
+
+    const saved = localStorage.getItem("duepilot_targets");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        salesTarget = parsed.salesTarget || 30000;
+        collectionTarget = parsed.collectionTarget || 25000;
+        lastMonthSalesTarget = parsed.lastMonthSalesTarget || 28000;
+        lastMonthSalesActual = parsed.lastMonthSalesActual || 26500;
+      } catch (_) {}
+    }
+
+    const currentSalesPct = Math.round((currentMoSales / (salesTarget || 1)) * 100);
+    const currentCollectionPct = Math.round((currentMoCollection / (collectionTarget || 1)) * 100);
+    const lastMonthPct = Math.round((lastMonthSalesActual / (lastMonthSalesTarget || 1)) * 100);
+
+    return {
+      salesTarget,
+      collectionTarget,
+      lastMonthSalesTarget,
+      lastMonthSalesActual,
+      currentMoSales,
+      currentMoCollection,
+      currentSalesPct,
+      currentCollectionPct,
+      lastMonthPct
+    };
+  }, [sales]);
+
   // Aggregate stats using analytical memoization
   const stats = useMemo(() => {
     let totalSale = 0;
@@ -39,10 +116,56 @@ export default function DashboardView({ areas, customers, sales }: DashboardView
       checkCollection += s.check || 0;
     });
 
-    // Calculate total actual outstanding due across all customers records
+    // Calculate total actual outstanding due across all customers records, split by Present vs Previous Month
     let totalDue = 0;
+    let presentMonthDue = 0;
+    let previousMonthDue = 0;
+
+    const currentYrMo = new Date().toISOString().slice(0, 7); // e.g. "2026-05"
+
     customers.forEach((c) => {
       totalDue += c.currentDue || 0;
+
+      // Filter sales belonging to this customer
+      const customerSales = sales.filter((s) => s.customerId === c.id);
+
+      let previousMoSales = 0;
+      let previousMoCollection = 0;
+      let currentMoSales = 0;
+      let currentMoCollection = 0;
+
+      customerSales.forEach((s) => {
+        if (s.date && s.date.startsWith(currentYrMo)) {
+          currentMoSales += s.saleAmount || 0;
+          currentMoCollection += s.collection || 0;
+        } else {
+          previousMoSales += s.saleAmount || 0;
+          previousMoCollection += s.collection || 0;
+        }
+      });
+
+      // Dues outstanding at beginning of current month
+      const dueAtMonthStart = c.openingDue + previousMoSales - previousMoCollection;
+
+      let remainingPreviousDue = 0;
+      let currentMonthNewDues = 0;
+
+      if (dueAtMonthStart > 0) {
+        if (currentMoCollection >= dueAtMonthStart) {
+          remainingPreviousDue = 0;
+          const leftOverCollection = currentMoCollection - dueAtMonthStart;
+          currentMonthNewDues = currentMoSales - leftOverCollection;
+        } else {
+          remainingPreviousDue = dueAtMonthStart - currentMoCollection;
+          currentMonthNewDues = currentMoSales;
+        }
+      } else {
+        remainingPreviousDue = dueAtMonthStart; // could be negative (credits)
+        currentMonthNewDues = currentMoSales - currentMoCollection;
+      }
+
+      presentMonthDue += currentMonthNewDues;
+      previousMonthDue += remainingPreviousDue;
     });
 
     // Group area-wise due structure
@@ -110,6 +233,8 @@ export default function DashboardView({ areas, customers, sales }: DashboardView
       totalSale,
       totalCollection,
       totalDue,
+      presentMonthDue,
+      previousMonthDue,
       cashCollection,
       checkCollection,
       areaWiseDue,
@@ -144,38 +269,91 @@ export default function DashboardView({ areas, customers, sales }: DashboardView
         </p>
       </div>
 
-      {/* Grid: High-level KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* Grid: High-level KPI Cards - Dues Analysis Breakdown */}
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-3 gap-5"
+      >
         
         {/* Card: Total Outstanding Dues */}
-        <div className="bg-[#161618] border border-white/5 rounded-xl p-5 relative overflow-hidden flex flex-col justify-between h-[120px]">
+        <motion.div variants={cardVariants} className="bg-[#161618] border border-white/5 rounded-xl p-5 relative overflow-hidden flex flex-col justify-between h-[120px]">
           <div className="flex justify-between items-start">
             <div>
-              <span className="text-[10px] font-mono font-medium tracking-wider text-slate-500 uppercase">Total Dues Liability</span>
-              <h3 className="text-2xl font-bold text-rose-455 text-rose-400 mt-1">
-                RM{stats.totalDue.toLocaleString()}
+              <span className="text-[10px] font-mono font-medium tracking-wider text-slate-500 uppercase">Total Outstanding Dues</span>
+              <h3 className="text-2xl font-bold text-rose-455 text-rose-400 mt-1 font-mono">
+                {currencySymbol}{stats.totalDue.toLocaleString()}
               </h3>
             </div>
-            <div className="p-2 bg-rose-500/10 rounded-lg text-rose-400">
+            <div className="p-2 bg-rose-500/10 rounded-lg text-rose-400 border border-rose-500/10">
               <FolderLock className="w-5 h-5" />
             </div>
           </div>
           <div className="text-[11px] text-slate-400 flex items-center gap-1.5 font-mono">
             <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
-            <span>Uncollected Balance Outstanding</span>
+            <span>Total current outstanding liabilities</span>
           </div>
-        </div>
+        </motion.div>
 
+        {/* Card: Present Month's Dues */}
+        <motion.div variants={cardVariants} className="bg-[#161618] border border-white/5 rounded-xl p-5 relative overflow-hidden flex flex-col justify-between h-[120px]">
+          <div className="flex justify-between items-start">
+            <div>
+              <span className="text-[10px] font-mono font-medium tracking-wider text-slate-500 uppercase">Present Month's Dues</span>
+              <h3 className="text-2xl font-bold text-amber-505 text-amber-400 mt-1 font-mono">
+                {currencySymbol}{stats.presentMonthDue.toLocaleString()}
+              </h3>
+            </div>
+            <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400 border border-amber-500/10">
+              <CalendarClock className="w-5 h-5 text-amber-400" />
+            </div>
+          </div>
+          <div className="text-[11px] text-slate-405 text-slate-400 flex items-center gap-1.5 font-mono">
+            <ArrowUpRight className="w-3.5 h-3.5 text-amber-400" />
+            <span>Accumulated during active month</span>
+          </div>
+        </motion.div>
+
+        {/* Card: Previous Month's Dues */}
+        <motion.div variants={cardVariants} className="bg-[#161618] border border-white/5 rounded-xl p-5 relative overflow-hidden flex flex-col justify-between h-[120px]">
+          <div className="flex justify-between items-start">
+            <div>
+              <span className="text-[10px] font-mono font-medium tracking-wider text-slate-500 uppercase">Previous Months' Dues</span>
+              <h3 className="text-2xl font-bold text-rose-505 text-[#f43f5e] mt-1 font-mono">
+                {currencySymbol}{stats.previousMonthDue.toLocaleString()}
+              </h3>
+            </div>
+            <div className="p-2 bg-[#f43f5e]/10 rounded-lg text-[#f43f5e] border border-[#f43f5e]/10">
+              <History className="w-5 h-5 text-[#f43f5e]" />
+            </div>
+          </div>
+          <div className="text-[11px] text-slate-404 text-slate-400 flex items-center gap-1.5 font-mono">
+            <span className="w-2 h-2 rounded-full bg-[#f43f5e]"></span>
+            <span>Uncollected balance from older periods</span>
+          </div>
+        </motion.div>
+
+      </motion.div>
+
+      {/* Grid: Financial Performance */}
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-3 gap-5"
+      >
+        
         {/* Card: Total Sales */}
-        <div className="bg-[#161618] border border-white/5 rounded-xl p-5 relative overflow-hidden flex flex-col justify-between h-[120px]">
+        <motion.div variants={cardVariants} className="bg-[#161618] border border-white/5 rounded-xl p-5 relative overflow-hidden flex flex-col justify-between h-[120px]">
           <div className="flex justify-between items-start">
             <div>
               <span className="text-[10px] font-mono font-medium tracking-wider text-slate-500 uppercase">Total Sales Generated</span>
-              <h3 className="text-2xl font-bold text-slate-100 mt-1">
-                RM{stats.totalSale.toLocaleString()}
+              <h3 className="text-2xl font-bold text-slate-100 mt-1 font-mono">
+                {currencySymbol}{stats.totalSale.toLocaleString()}
               </h3>
             </div>
-            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">
+            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 border border-emerald-500/10">
               <TrendingUp className="w-5 h-5 text-emerald-400" />
             </div>
           </div>
@@ -183,18 +361,18 @@ export default function DashboardView({ areas, customers, sales }: DashboardView
             <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
             <span>Cumulative gross revenue tickets</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card: Total Collections */}
-        <div className="bg-[#161618] border border-white/5 rounded-xl p-5 relative overflow-hidden flex flex-col justify-between h-[120px]">
+        <motion.div variants={cardVariants} className="bg-[#161618] border border-white/5 rounded-xl p-5 relative overflow-hidden flex flex-col justify-between h-[120px]">
           <div className="flex justify-between items-start">
             <div>
               <span className="text-[10px] font-mono font-medium tracking-wider text-slate-500 uppercase">Total Collections</span>
-              <h3 className="text-2xl font-bold text-[#3b82f6] text-blue-400 mt-1">
-                RM{stats.totalCollection.toLocaleString()}
+              <h3 className="text-2xl font-bold text-[#3b82f6] text-blue-400 mt-1 font-mono">
+                {currencySymbol}{stats.totalCollection.toLocaleString()}
               </h3>
             </div>
-            <div className="p-2 bg-blue-500/10 rounded-lg text-blue-405 text-blue-400">
+            <div className="p-2 bg-blue-500/10 rounded-lg text-blue-405 text-blue-400 border border-blue-500/10">
               <Coins className="w-5 h-5" />
             </div>
           </div>
@@ -202,47 +380,134 @@ export default function DashboardView({ areas, customers, sales }: DashboardView
             <ArrowDownLeft className="w-3.5 h-3.5 text-blue-400" />
             <span>Cash and Check aggregates</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Card: Collection Rate */}
-        <div className="bg-[#161618] border border-white/5 rounded-xl p-5 relative overflow-hidden flex flex-col justify-between h-[120px]">
+        <motion.div variants={cardVariants} className="bg-[#161618] border border-white/5 rounded-xl p-5 relative overflow-hidden flex flex-col justify-between h-[120px]">
           <div className="flex justify-between items-start">
             <div>
               <span className="text-[10px] font-mono font-medium tracking-wider text-slate-500 uppercase">Gross Collection Rate</span>
-              <h3 className="text-2xl font-bold text-emerald-400 mt-1">
+              <h3 className="text-2xl font-bold text-emerald-400 mt-1 font-mono">
                 {collectionRate}%
               </h3>
             </div>
-            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">
+            <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 border border-emerald-500/10">
               <CirclePercent className="w-5 h-5 text-emerald-400" />
             </div>
           </div>
           <div className="w-full bg-[#0A0A0B] rounded-full h-1.5 mt-2 overflow-hidden border border-white/5">
             <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: `${Math.min(collectionRate, 100)}%` }}></div>
           </div>
-        </div>
+        </motion.div>
 
-      </div>
+      </motion.div>
 
       {/* Grid: Liquid Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-[#161618]/60 border border-white/5 p-4 rounded-xl flex items-center gap-4">
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-2 gap-5"
+      >
+        <motion.div variants={cardVariants} className="bg-[#161618]/60 border border-white/5 p-4 rounded-xl flex items-center gap-4">
           <div className="p-3 bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 rounded-xl">
             <Receipt className="w-5 h-5" />
           </div>
           <div>
             <span className="text-[10px] font-mono text-slate-500 uppercase">Liquid Cash Collected</span>
-            <p className="text-lg font-bold text-slate-200">RM{stats.cashCollection.toLocaleString()}</p>
+            <p className="text-lg font-bold text-slate-200">{currencySymbol}{stats.cashCollection.toLocaleString()}</p>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-[#161618]/60 border border-white/5 p-4 rounded-xl flex items-center gap-4">
+        <motion.div variants={cardVariants} className="bg-[#161618]/60 border border-white/5 p-4 rounded-xl flex items-center gap-4">
           <div className="p-3 bg-blue-500/10 text-blue-400 border border-blue-500/10 rounded-xl">
             <PiggyBank className="w-5 h-5" />
           </div>
           <div>
             <span className="text-[10px] font-mono text-slate-500 uppercase">Check/Bank Clearance</span>
-            <p className="text-lg font-bold text-slate-200">RM{stats.checkCollection.toLocaleString()}</p>
+            <p className="text-lg font-bold text-slate-200">{currencySymbol}{stats.checkCollection.toLocaleString()}</p>
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {/* Box: Performance Targets (Sales ERP SaaS Premium Theme) */}
+      <div className="bg-[#161618] border border-white/5 p-5.5 rounded-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-white/5 pb-3">
+          <div className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-[#FFD700]" />
+            <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Sales ERP Monthly Target & Performance Analysis</h3>
+          </div>
+          <span className="text-[10px] font-mono text-slate-500 bg-[#0D0D0D] border border-white/5 px-2.5 py-1 rounded-md flex items-center gap-1.5 mt-2 sm:mt-0">
+            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Active Goal Tracking Month</span>
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Current Month Sales Metric */}
+          <div className="bg-[#0A0A0B] border border-white/5 p-4 rounded-lg space-y-3">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-[10px] font-mono text-slate-400 uppercase flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-[#FFD700]" /> Current Month Sales
+              </span>
+              <span className="text-[10px] font-mono text-emerald-400 font-semibold">{targets.currentSalesPct}% Achieved</span>
+            </div>
+            <div>
+              <div className="flex justify-between items-baseline">
+                <h4 className="text-lg font-mono font-extrabold text-slate-150">{currencySymbol} {targets.currentMoSales.toLocaleString()}</h4>
+                <span className="text-[11px] text-slate-500">Target: {currencySymbol} {targets.salesTarget.toLocaleString()}</span>
+              </div>
+              <div className="w-full bg-[#161618] h-2 rounded-full overflow-hidden mt-2 border border-white/5">
+                <div 
+                  className="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(targets.currentSalesPct, 100)}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Current Month Collection Metric */}
+          <div className="bg-[#0A0A0B] border border-white/5 p-4 rounded-lg space-y-3">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-[10px] font-mono text-slate-400 uppercase flex items-center gap-1">
+                <Coins className="w-3.5 h-3.5 text-[#3b82f6]" /> Current Month Collections
+              </span>
+              <span className="text-[10px] font-mono text-[#3b82f6] font-semibold">{targets.currentCollectionPct}% Achieved</span>
+            </div>
+            <div>
+              <div className="flex justify-between items-baseline">
+                <h4 className="text-lg font-mono font-extrabold text-[#3b82f6]">{currencySymbol} {targets.currentMoCollection.toLocaleString()}</h4>
+                <span className="text-[11px] text-slate-500">Target: {currencySymbol} {targets.collectionTarget.toLocaleString()}</span>
+              </div>
+              <div className="w-full bg-[#161618] h-2 rounded-full overflow-hidden mt-2 border border-white/5">
+                <div 
+                  className="bg-gradient-to-r from-blue-600 to-blue-400 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(targets.currentCollectionPct, 100)}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Last Month Performance Metric */}
+          <div className="bg-[#0A0A0B] border border-white/5 p-4 rounded-lg space-y-3">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-[10px] font-mono text-slate-400 uppercase flex items-center gap-1">
+                <Award className="w-3.5 h-3.5 text-amber-500" /> Last Month's Target
+              </span>
+              <span className="text-[10px] font-mono text-[#FFD700] font-semibold">{targets.lastMonthPct}% Completed</span>
+            </div>
+            <div>
+              <div className="flex justify-between items-baseline">
+                <h4 className="text-lg font-mono font-extrabold text-[#FFD700]">{currencySymbol} {targets.lastMonthSalesActual.toLocaleString()}</h4>
+                <span className="text-[11px] text-slate-500">Target: {currencySymbol} {targets.lastMonthSalesTarget.toLocaleString()}</span>
+              </div>
+              <div className="w-full bg-[#161618] h-2 rounded-full overflow-hidden mt-2 border border-white/5">
+                <div 
+                  className="bg-gradient-to-r from-amber-600 to-[#FFD700] h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(targets.lastMonthPct, 100)}%` }}
+                ></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -336,7 +601,7 @@ export default function DashboardView({ areas, customers, sales }: DashboardView
                     </text>
 
                     {/* Tooltip on hovering grouping (CSS triggers or simple display) */}
-                    <title>{`${m.label} -> Sale: RM${m.sale.toLocaleString()} | Collection: RM${m.collection.toLocaleString()}`}</title>
+                    <title>{`${m.label} -> Sale: ${currencySymbol}${m.sale.toLocaleString()} | Collection: ${currencySymbol}${m.collection.toLocaleString()}`}</title>
                   </g>
                 );
               })}
@@ -368,7 +633,7 @@ export default function DashboardView({ areas, customers, sales }: DashboardView
                   <div key={idx} className="space-y-1.5 group">
                     <div className="flex justify-between text-xs">
                       <span className="font-medium text-slate-300 group-hover:text-emerald-400 transition-all">{a.areaName}</span>
-                      <span className="font-mono text-slate-400 font-medium">RM{a.totalDue.toLocaleString()}</span>
+                      <span className="font-mono text-slate-400 font-medium">{currencySymbol}{a.totalDue.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex-1 bg-[#0A0A0B] h-2 rounded-full overflow-hidden border border-white/5">
