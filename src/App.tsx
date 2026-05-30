@@ -64,13 +64,39 @@ export default function App() {
     setIsFirebaseLinked(linkStatus);
 
     if (linkStatus && auth) {
-      const unsubscribe = auth.onAuthStateChanged((fbUser: any) => {
+      const unsubscribe = auth.onAuthStateChanged(async (fbUser: any) => {
         if (fbUser) {
-          if (userParsed && !userParsed.id.startsWith("demo-")) {
-            setCurrentUser(userParsed);
-          } else {
-            // Firebase has logged in user but local store is missing or demo, clear and let user login
-            setCurrentUser(null);
+          try {
+            // Always retrieve/verify/sync user profile from Firestore to prevent stale local cache problems or missing remote profiles
+            const usersList = await dbService.getUsers();
+            let matched = usersList.find((u) => u.id === fbUser.uid);
+            if (!matched) {
+              // If not registered in Firestore users yet, automatically register them as Admin (as requested)
+              const userEmail = fbUser.email || "";
+              matched = await dbService.addUser(
+                fbUser.uid,
+                userEmail,
+                fbUser.displayName || "Unknown User",
+                "admin",
+                "active"
+              );
+            }
+            if (matched && matched.status !== "inactive") {
+              setCurrentUser(matched);
+              localStorage.setItem("erp_session_user", JSON.stringify(matched));
+            } else {
+              setCurrentUser(null);
+              localStorage.removeItem("erp_session_user");
+              signOut(auth);
+            }
+          } catch (err) {
+            console.error("Failed to sync auth state user with Firestore:", err);
+            if (userParsed && userParsed.id === fbUser.uid) {
+              setCurrentUser(userParsed);
+            } else {
+              setCurrentUser(null);
+              localStorage.removeItem("erp_session_user");
+            }
           }
         } else {
           // No active Firebase login. Fall back to demo if cached user is demo

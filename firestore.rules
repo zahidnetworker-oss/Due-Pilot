@@ -109,22 +109,21 @@ service cloud.firestore {
         // An admin can create any user
         isAdmin() || 
         // A user can create their own profile during initial Google Login,
-        // BUT force their role to be Salesman, never Admin (Prevent Self-Assign role escalation)
-        (userId == request.auth.uid && incoming().role == 'salesman' && incoming().status == 'active' && incoming().email == request.auth.token.email)
+        // allowing 'admin' role as requested by user
+        (userId == request.auth.uid && incoming().status == 'active' && incoming().email == request.auth.token.email)
       );
 
       // Updating user profiles
       allow update: if isEmailVerified() && isValidUser(incoming()) && (
         // Only admins can change status/role or update other profiles
         isAdmin() || 
-        // Simple profile updates for own account, avoiding changing their own critical role/status fields
+        // Simple profile updates for own account, allowing them to suspend their account (changing status to inactive), but not change role/email
         (userId == request.auth.uid 
          && incoming().role == existing().role 
-         && incoming().status == existing().status
          && incoming().email == existing().email)
       );
 
-      allow delete: if isAdmin();
+      allow delete: if isEmailVerified() && (isAdmin() || userId == request.auth.uid);
     }
 
     // 2. Areas Collection

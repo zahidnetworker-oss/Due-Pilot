@@ -23,10 +23,13 @@ import {
   RefreshCw,
   AlertCircle,
   Sparkles,
-  Check
+  Check,
+  ShieldAlert,
+  Ban,
+  AlertTriangle
 } from "lucide-react";
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { db, auth, signOut } from "../lib/firebase";
 
 interface SettingsViewProps {
   currentUser: AppUser;
@@ -72,6 +75,95 @@ export default function SettingsView({ currentUser, refreshData }: SettingsViewP
   const [errorText, setErrorText] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+
+  // Own Account Management States
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [typedConfirmation, setTypedConfirmation] = useState("");
+  const [isProcessingAccount, setIsProcessingAccount] = useState(false);
+
+  // Handle Suspend Self
+  const handleSuspendSelf = async () => {
+    setIsProcessingAccount(true);
+    setErrorText(null);
+    try {
+      // 1. Mark status as inactive in DB (suspending user)
+      if (dbService.isFirebaseActive() && currentUser.id) {
+        await dbService.updateUser(currentUser.id, { status: "inactive" });
+      } else {
+        // Local mode suspend
+        const list = await dbService.getUsers();
+        const idx = list.findIndex(u => u.id === currentUser.id);
+        if (idx > -1) {
+          list[idx].status = "inactive";
+          localStorage.setItem("erp_users", JSON.stringify(list));
+        }
+      }
+
+      // 2. Clear locally cached auth & session user
+      localStorage.removeItem("erp_session_user");
+
+      // 3. Clear auth state if using standard Firebase
+      if (auth) {
+        await signOut(auth);
+      }
+
+      // 4. Reload page to trigger redirect
+      alert("Your account has been suspended successfully.");
+      window.location.reload();
+    } catch (err: any) {
+      setErrorText("Suspend Failed: " + (err.message || String(err)));
+    } finally {
+      setIsProcessingAccount(false);
+      setShowSuspendModal(false);
+    }
+  };
+
+  // Handle Delete Self & Purge data (all local/remote records cleared permanently)
+  const handleDeleteSelfAndPurge = async () => {
+    if (typedConfirmation.toUpperCase() !== "DELETE") {
+      alert("Please type 'DELETE' to confirm.");
+      return;
+    }
+
+    setIsProcessingAccount(true);
+    setErrorText(null);
+    try {
+      // 1. Delete user from database if synced
+      if (dbService.isFirebaseActive() && currentUser.id) {
+        await dbService.deleteUser(currentUser.id);
+      } else {
+        // Local mode delete
+        const list = await dbService.getUsers();
+        const updated = list.filter(u => u.id !== currentUser.id);
+        localStorage.setItem("erp_users", JSON.stringify(updated));
+      }
+
+      // 2. Pure wipe of all application states (all data cleared permanently)
+      localStorage.removeItem("erp_areas");
+      localStorage.removeItem("erp_customers");
+      localStorage.removeItem("erp_sales");
+      localStorage.removeItem("erp_session_user");
+      localStorage.removeItem("duepilot_profile_settings");
+      localStorage.removeItem("duepilot_targets");
+      localStorage.removeItem("duepilot_currency");
+      localStorage.removeItem("duepilot_permitted_users");
+
+      // 3. Complete signout from active Auth
+      if (auth) {
+        await signOut(auth);
+      }
+
+      // 4. Reload window (User is now fully purged and dropped back to clean state)
+      alert("Your account and all records have been purged successfully!");
+      window.location.reload();
+    } catch (err: any) {
+      setErrorText("Account Discard Failed: " + (err.message || String(err)));
+    } finally {
+      setIsProcessingAccount(false);
+      setShowDeleteModal(false);
+    }
+  };
 
   // Process settings load
   useEffect(() => {
@@ -702,6 +794,42 @@ export default function SettingsView({ currentUser, refreshData }: SettingsViewP
             </div>
           </div>
 
+          {/* Box 4: Account Actions (Suspend/Delete with custom popups) */}
+          <div className="bg-[#161618] border border-red-500/15 rounded-xl p-6 space-y-4">
+            <h3 className="text-sm font-semibold text-rose-500 flex items-center gap-2 pb-3 border-b border-red-500/10">
+              <ShieldAlert className="w-4.5 h-4.5" /> DANGER ZONE: ACCOUNT CONTROLS
+            </h3>
+            
+            <p className="text-xs text-slate-400 font-light leading-relaxed">
+              Warning: You can manage your own account settings here. You can temporarily suspend your access or permanently purge your account along with all state data.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              {/* Suspend Button */}
+              <button
+                type="button"
+                onClick={() => setShowSuspendModal(true)}
+                className="flex-1 h-10 px-4 bg-orange-600/10 hover:bg-orange-600/15 text-orange-400 border border-orange-500/15 hover:border-orange-500/30 rounded-lg flex items-center justify-center gap-2 text-xs font-semibold transition-all cursor-pointer"
+              >
+                <Ban className="w-4 h-4" />
+                <span>Suspend Account</span>
+              </button>
+
+              {/* Delete Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setTypedConfirmation("");
+                  setShowDeleteModal(true);
+                }}
+                className="flex-1 h-10 px-4 bg-rose-600/10 hover:bg-rose-600/15 text-rose-400 border border-rose-500/15 hover:border-rose-500/30 rounded-lg flex items-center justify-center gap-2 text-xs font-semibold transition-all cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Account</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* Right Column: Database Backups & Recovery */}
@@ -806,6 +934,125 @@ export default function SettingsView({ currentUser, refreshData }: SettingsViewP
         </div>
 
       </div>
+
+      {/* 1. SUSPEND PROFILE MODAL */}
+      {showSuspendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md bg-[#161618] border border-orange-500/20 rounded-xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-orange-500/10 text-orange-400 rounded-lg">
+                <Ban className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-white">Suspend Your Account Temporarily?</h3>
+                <p className="text-xs text-slate-400 font-mono mt-1">Suspend Your Active User Session?</p>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-300 bg-orange-950/10 border border-orange-500/10 rounded-lg p-3.5 space-y-2">
+              <p>
+                If you suspend your account, you will instantly lose access to this control panel and be signed out.
+              </p>
+              <p className="font-light text-slate-400">
+                An administrator or your own reactivation can restore access at a later time.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSuspendModal(false)}
+                disabled={isProcessingAccount}
+                className="h-9 px-4 bg-[#1A1A1C] border border-white/5 hover:bg-white/5 text-slate-300 rounded-lg text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSuspendSelf}
+                disabled={isProcessingAccount}
+                className="h-9 px-4 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                {isProcessingAccount ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Check className="w-3.5 h-3.5" />
+                )}
+                <span>Confirm Suspend</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. DANGER ZONE CONFIRM DELETE MODAL */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg bg-[#161618] border border-rose-500/20 rounded-xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-lg animate-pulse">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-white">Are you sure you want to delete your account?</h3>
+                <p className="text-xs text-rose-400 font-mono mt-0.5">PERMANENT ACCOUNT PURGE & HARD RESET</p>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-300 bg-rose-955/20 border border-rose-500/10 rounded-lg p-4 space-y-3 font-sans">
+              <p className="font-semibold text-rose-400 font-sans">This action is completely irreversible. Once deleted, the following data will be permanently erased:</p>
+              
+              <ul className="list-disc pl-4 space-y-1 text-slate-400 font-sans">
+                <li>Your active user profile and authorization credentials.</li>
+                <li>All registered customer records, dues, and transaction logs.</li>
+                <li>All sales ledger data and regional area references.</li>
+                <li>Your client settings and cloud backup history logs.</li>
+              </ul>
+
+              <p className="font-light mt-2 italic text-rose-300/80 font-sans">
+                Once deleted, this data cannot be recovered. The database states will be hard-reset.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-mono text-rose-400 uppercase tracking-wider block">
+                Type <strong className="text-white">"DELETE"</strong> in the box below to confirm
+              </label>
+              <input
+                type="text"
+                value={typedConfirmation}
+                onChange={(e) => setTypedConfirmation(e.target.value)}
+                placeholder="DELETE"
+                className="w-full h-11 px-3 bg-[#0A0A0B] border border-rose-500/20 focus:border-rose-500 rounded-lg text-sm text-center font-mono font-bold uppercase text-rose-400 outline-none transition-all"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isProcessingAccount}
+                className="h-9 px-4 bg-[#1A1A1C] border border-white/5 hover:bg-white/5 text-slate-300 rounded-lg text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSelfAndPurge}
+                disabled={isProcessingAccount || typedConfirmation.toUpperCase() !== "DELETE"}
+                className="h-9 px-4 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                {isProcessingAccount ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>Confirm Purge</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

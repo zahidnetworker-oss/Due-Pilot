@@ -217,19 +217,11 @@ export const dbService = {
   isFirebaseActive(): boolean {
     if (isPlaceholderConfig || db === null) return false;
     
-    // Check if Firebase Auth is currently logged in
+    // Check if Firebase Auth is currently logged in.
+    // If we have an active non-demo cached session, we must also guarantee that firebase auth is actually initialized and has a user,
+    // otherwise any Firestore call will crash with "Missing or insufficient permissions".
     if (auth && auth.currentUser !== null) return true;
     
-    // Check if we have an active non-demo cached session
-    const cached = localStorage.getItem("erp_session_user");
-    if (cached) {
-      try {
-        const user = JSON.parse(cached);
-        if (user && user.id && !user.id.startsWith("demo-")) {
-          return true;
-        }
-      } catch (_) {}
-    }
     return false;
   },
 
