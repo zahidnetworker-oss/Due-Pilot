@@ -72,18 +72,16 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
 
       // Query registered user list
       const users = await dbService.getUsers();
-      const isOwnerEmail = allowed.includes(userEmail.toLowerCase()) || userEmail.toLowerCase().includes("admin") || users.length === 0;
 
       let matchedUser = users.find((u) => u.email.toLowerCase() === userEmail.toLowerCase());
 
       if (!matchedUser) {
-        // Auto-bootstrap as Admin if they match owner or there are no users yet
-        const designatedRole = isOwnerEmail ? "admin" : "salesman";
+        // Automatically assign new signups with 'admin' privileges as requested. Logged-in admins can update roles in Settings afterwards.
         matchedUser = await dbService.addUser(
           gUser.uid,
           userEmail,
           gUser.displayName || "Unknown User",
-          designatedRole,
+          "admin",
           "active"
         );
       }
@@ -117,8 +115,12 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         {/* Banner Indicating Mode */}
         <div className="flex items-center gap-2 justify-center mb-6 self-center">
           {isFirebaseMode ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-[#0A0A0B] text-emerald-400 border border-white/5">
-              <Globe className="w-3.5 h-3.5 animate-spin duration-3000" /> Web Active
+            <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-mono font-semibold bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.12)]">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>ENTERPRISE CLOUD SYNC LIVE</span>
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-[#0A0A0B] text-emerald-400 border border-white/5">
